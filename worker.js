@@ -337,9 +337,9 @@ function renderMainPage() {
         
         // 檢查是否有緩存，添加視覺提示
         const isCached = channelDetailsCache.has(channel.id.toString());
-        const cacheIndicator = isCached ? ' ⚡' : '';
+        const cacheIndicator = isCached ? '<span class="cache-indicator">⚡</span>' : '';
         
-        channelItem.innerHTML = '<div style="font-weight: 500;">' + channel.id + cacheIndicator + '</div><div style="font-size: 12px; color: #6b7280; margin-top: 2px;">' + (channel.name || '未命名') + '</div>';
+        channelItem.innerHTML = '<div class="channel-id">' + channel.id + cacheIndicator + '</div><div class="channel-name">' + (channel.name || '未命名') + '</div>';
         
         // 添加點擊事件
         channelItem.addEventListener('click', () => {
@@ -862,19 +862,57 @@ function renderMainPage() {
       cursor: pointer;
       transition: all 0.2s ease;
       font-size: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
     }
 
     .channel-item:hover {
       background: #f8fafc;
+      transform: translateX(2px);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
     }
 
     .channel-item.selected {
       background: linear-gradient(135deg, #667eea, #764ba2);
       color: white;
+      box-shadow: 0 3px 8px rgba(102, 126, 234, 0.3);
+    }
+    
+    .channel-item.selected .channel-name {
+      color: rgba(255, 255, 255, 0.9);
     }
 
     .channel-item:last-child {
       border-bottom: none;
+    }
+    
+    .channel-id {
+      font-weight: 600;
+      font-size: 15px;
+      color: #1f2937;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    
+    .channel-item.selected .channel-id {
+      color: white;
+    }
+    
+    .channel-name {
+      font-size: 13px;
+      color: #6b7280;
+      max-width: 200px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    
+    .cache-indicator {
+      color: #fbbf24;
+      font-size: 16px;
+      margin-left: 4px;
     }
 
     /* 提示信息 */
@@ -1047,6 +1085,14 @@ function renderMainPage() {
 
       .btn {
         justify-content: center;
+      }
+      
+      .channel-name {
+        max-width: 120px;
+      }
+      
+      .channel-item {
+        padding: 10px 12px;
       }
     }
 
