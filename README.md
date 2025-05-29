@@ -1,9 +1,10 @@
 # 🚀 NewAPI Worker 工具
 
-這是一個基於 Cloudflare Workers 的工具，用於安全地操作 NewAPI，特別是查詢渠道詳細資訊。所有敏感憑證資料都僅保存在使用者的瀏覽器本地存儲中，確保資料安全性。
+這是一個基於 Cloudflare Workers 的現代化 PWA 工具，採用兩欄式響應設計，用於安全地操作 NewAPI，特別是查詢渠道詳細資訊。採用智能緩存機制，提供桌面級的用戶體驗。所有敏感憑證資料都僅保存在使用者的瀏覽器本地存儲中，確保資料安全性。
 
 <div align="center">
 
+![PWA](https://img.shields.io/badge/PWA-Ready-purple?style=for-the-badge&logo=pwa&logoColor=white)
 ![Cloudflare](https://img.shields.io/badge/Cloudflare-F38020?style=for-the-badge&logo=cloudflare&logoColor=white)
 ![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black)
 ![HTML5](https://img.shields.io/badge/HTML5-E34F26?style=for-the-badge&logo=html5&logoColor=white)
@@ -27,7 +28,9 @@
     - [🎨 使用體驗](#-使用體驗)
     - [📊 資料處理](#-資料處理)
     - [💾 離線功能](#-離線功能)
+  - [🔄 更新記錄](#-更新記錄)
   - [⚠️ 注意事項](#️-注意事項)
+  - [📄 許可證](#-許可證)
 
 ## 📋 部署指南
 
@@ -195,6 +198,118 @@ graph TD
 - **💡 憑證記憶**：可選擇將憑證保存在本地，下次訪問自動填充。
 - **🧹 清除憑證**：提供簡單的方式清除保存的憑證。
 
+## 🔄 更新記錄
+
+### v2.0.0 - PWA風格重大更新 (2024-12-19)
+
+<details>
+<summary><strong>🎨 PWA風格UI重設計</strong> - 點擊展開詳情</summary>
+
+#### 📐 布局架構革新
+- **🖥️ 兩欄式布局**：針對桌面和筆電優化的左右分欄設計
+  - **左側面板 (480px)**：API設定 + 渠道管理控制區
+  - **右側面板 (響應式)**：專門的渠道詳情展示區域
+- **📱 響應式設計**：平板和手機自動切換為垂直布局
+- **🔍 智能適配**：根據屏幕尺寸自動調整界面元素
+
+#### 🎨 視覺設計提升
+- **🌈 現代化配色**：藍紫色漸變主題，提升視覺美感
+- **🔤 字體優化**：採用系統字體棧 (-apple-system, BlinkMacSystemFont)
+- **🎯 卡片式設計**：清晰的區塊劃分和層次結構
+- **✨ 動畫效果**：淡入動畫、hover效果和狀態過渡
+
+#### 📋 PWA功能支持
+- **📱 PWA Meta標籤**：完整的漸進式Web應用配置
+- **🎨 主題色彩**：統一的品牌配色方案
+- **📲 應用圖標**：支持添加到主屏幕
+
+</details>
+
+<details>
+<summary><strong>⚡ 智能緩存系統</strong> - 點擊展開詳情</summary>
+
+#### 🧠 自動載入機制
+- **🔄 智能啟動**：有憑證時自動獲取渠道列表
+- **⚡ 預緩存技術**：自動預緩存前10個渠道的詳情數據
+- **💾 本地存儲**：利用瀏覽器緩存提升載入速度
+- **🔍 緩存標示**：⚡ 圖標標示已緩存的渠道
+
+#### 📈 性能優化
+- **🚀 秒速載入**：緩存渠道的詳情瞬間顯示
+- **🌐 網絡優化**：減少不必要的API請求
+- **⏱️ 智能延遲**：避免請求過於頻繁的保護機制
+
+</details>
+
+<details>
+<summary><strong>🎯 用戶體驗革新</strong> - 點擊展開詳情</summary>
+
+#### 🖱️ 交互體驗優化
+- **👆 一鍵查看**：直接點擊渠道項目即可查看詳情，無需額外按鈕
+- **🔍 實時搜索**：輸入時即時過濾，顯示匹配結果數量
+- **📊 狀態反饋**：即時的狀態指示器和進度顯示
+- **🎨 視覺提示**：hover效果和選中狀態的清晰標示
+
+#### 🎛️ 界面控制增強
+- **📝 表單優化**：更好的輸入框設計和焦點效果
+- **🔘 按鈕升級**：漸變按鈕和禁用狀態的視覺反饋
+- **📱 響應觸控**：觸控設備的優化體驗
+
+#### 🎪 新增視覺元素
+- **📋 空狀態設計**：美觀的佔位符和引導信息
+- **❌ 錯誤狀態**：友好的錯誤提示界面
+- **💡 智能提示**：操作指導和功能說明
+
+</details>
+
+<details>
+<summary><strong>🔗 功能增強</strong> - 點擊展開詳情</summary>
+
+#### 🌐 GitHub整合
+- **🔗 項目連結**：右上角固定的GitHub圖標
+- **🎨 動態效果**：hover縮放和陰影效果
+- **📱 響應設計**：移動設備的圖標自適應
+
+#### 💾 數據管理優化
+- **🏷️ 緩存標識**：視覺化展示哪些渠道已預緩存
+- **🔄 智能刷新**：保持數據新鮮度的機制
+- **📊 狀態管理**：更精確的載入和錯誤狀態處理
+
+#### 🎨 詳情展示增強
+- **📋 表格美化**：更清晰的數據展示格式
+- **📱 複製優化**：改進的複製功能和反饋
+- **🎯 焦點管理**：更好的鍵盤導航支持
+
+</details>
+
+<details>
+<summary><strong>🔧 技術架構優化</strong> - 點擊展開詳情</summary>
+
+#### 💻 代碼結構改進
+- **🧹 代碼重構**：模塊化的JavaScript代碼結構
+- **🎯 DOM操作優化**：更高效的元素選擇和事件處理
+- **🔄 狀態管理**：統一的應用狀態管理機制
+- **📝 代碼可維護性**：清晰的函數命名和註釋
+
+#### ⚡ 性能提升
+- **🚀 載入速度**：優化的CSS和JavaScript載入
+- **💾 內存管理**：更好的緩存策略和內存使用
+- **🌐 網絡請求**：智能的API請求管理和錯誤處理
+- **📱 移動端優化**：觸控設備的性能優化
+
+#### 🛠️ 開發體驗
+- **🔍 調試支持**：更好的錯誤信息和日誌
+- **📊 狀態監控**：實時的狀態顯示和反饋
+- **🔧 可擴展性**：易於添加新功能的架構設計
+
+</details>
+
+### v1.0.0 - 初始版本
+- **🚀 基礎功能**：NewAPI渠道查詢工具
+- **🔐 安全設計**：本地憑證存儲
+- **🔍 搜索功能**：模糊搜索和過濾
+- **📋 複製功能**：一鍵複製渠道資訊
+
 ---
 
 ## ⚠️ 注意事項
@@ -216,3 +331,31 @@ graph TD
 <div align="center">
 Made with ❤️ for better API management
 </div> 
+
+## 📄 許可證
+
+本專案採用 [MIT 許可證](LICENSE)。你可以自由地使用、修改和分發此程式碼，包括商業用途，只需保留原始著作權聲明。
+
+```
+MIT License
+
+Copyright (c) 2024 [你的名稱/組織]
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+``` 

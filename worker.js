@@ -93,6 +93,8 @@ function renderMainPage() {
     // 初始化變數
     let channelData = [];
     let currentChannelDetails = null;
+    let channelDetailsCache = new Map(); // 添加詳情緩存
+    let selectedChannelId = null;
     
     // DOM 元素引用
     const apiUrlInput = document.getElementById('api-url');
@@ -103,9 +105,7 @@ function renderMainPage() {
     const getChannelsBtn = document.getElementById('get-channels');
     const channelSelectorGroup = document.getElementById('channel-selector-group');
     const channelSearchInput = document.getElementById('channel-search');
-    const channelSelect = document.getElementById('channel-select');
-    const getDetailsBtn = document.getElementById('get-details');
-    const detailsSection = document.getElementById('channel-details-section');
+    const channelList = document.getElementById('channel-list');
     const detailsContainer = document.getElementById('channel-details-container');
     const statusElement = document.getElementById('status');
     
@@ -118,11 +118,85 @@ function renderMainPage() {
       if (accessToken) accessTokenInput.value = accessToken;
       
       if (apiUrl && accessToken) {
-        credentialsStatus.textContent = '已載入儲存的憑證';
+        showCredentialsStatus('已載入儲存的憑證', 'success');
+        
+        // 自動獲取渠道列表
         setTimeout(() => {
-          credentialsStatus.textContent = '';
-        }, 3000);
+          autoLoadChannels();
+        }, 500);
       }
+    }
+    
+    // 顯示憑證狀態
+    function showCredentialsStatus(message, type = 'success') {
+      credentialsStatus.textContent = message;
+      credentialsStatus.className = 'status-indicator ' + (type === 'success' ? 'status-success' : 'status-error');
+      credentialsStatus.classList.remove('hidden');
+      
+      setTimeout(() => {
+        credentialsStatus.classList.add('hidden');
+      }, 3000);
+    }
+    
+    // 自動載入渠道
+    async function autoLoadChannels() {
+      updateStatus('正在自動載入渠道列表...');
+      
+      try {
+        const result = await callAPI('/api/channel/', 'GET', {
+          p: 0,
+          page_size: 1000,
+          id_sort: true
+        });
+        
+        if (!result || !result.data || result.data.length === 0) {
+          updateStatus('沒有找到渠道數據');
+          return;
+        }
+        
+        channelData = result.data;
+        
+        updateChannelList(channelData);
+        
+        channelSearchInput.value = '';
+        
+        channelSelectorGroup.classList.remove('hidden');
+        updateStatus('已自動載入 ' + channelData.length + ' 個渠道，正在預緩存前10個渠道詳情...');
+        
+        // 預緩存前10個渠道的詳情
+        await precacheChannelDetails();
+        
+      } catch (error) {
+        showError('自動載入渠道列表失敗: ' + error.message);
+      }
+    }
+    
+    // 預緩存前10個渠道的詳情
+    async function precacheChannelDetails() {
+      const topChannels = channelData.slice(0, 10);
+      let cached = 0;
+      
+      for (let i = 0; i < topChannels.length; i++) {
+        const channel = topChannels[i];
+        try {
+          const result = await callAPI('/api/channel', 'PUT', {}, {
+            id: parseInt(channel.id)
+          });
+          
+          if (result && result.data) {
+            channelDetailsCache.set(channel.id.toString(), result.data);
+            cached++;
+            updateStatus('已預緩存 ' + cached + '/' + topChannels.length + ' 個渠道詳情');
+          }
+        } catch (error) {
+          console.log('預緩存渠道 ' + channel.id + ' 失敗:', error);
+        }
+        
+        // 添加小延遲避免請求過於頻繁
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+      
+      updateStatus('完成！已載入 ' + channelData.length + ' 個渠道，預緩存了 ' + cached + ' 個渠道詳情');
     }
     
     // 儲存憑證
@@ -131,17 +205,19 @@ function renderMainPage() {
       const accessToken = accessTokenInput.value.trim();
       
       if (!apiUrl || !accessToken) {
-        alert('請輸入 API URL 和 Access Token');
+        showCredentialsStatus('請輸入 API URL 和 Access Token', 'error');
         return;
       }
       
       localStorage.setItem('newapi_url', apiUrl);
       localStorage.setItem('newapi_token', accessToken);
       
-      credentialsStatus.textContent = '憑證已儲存';
+      showCredentialsStatus('憑證已儲存', 'success');
+      
+      // 儲存後自動載入渠道
       setTimeout(() => {
-        credentialsStatus.textContent = '';
-      }, 3000);
+        autoLoadChannels();
+      }, 500);
     });
     
     // 清除憑證
@@ -152,11 +228,22 @@ function renderMainPage() {
       apiUrlInput.value = '';
       accessTokenInput.value = '';
       
-      credentialsStatus.textContent = '憑證已清除';
-      setTimeout(() => {
-        credentialsStatus.textContent = '';
-      }, 3000);
+      // 清除緩存和狀態
+      channelData = [];
+      channelDetailsCache.clear();
+      selectedChannelId = null;
+      channelSelectorGroup.classList.add('hidden');
+      
+      // 重置詳情面板
+      resetDetailsPanel();
+      
+      showCredentialsStatus('憑證已清除', 'success');
     });
+    
+    // 重置詳情面板
+    function resetDetailsPanel() {
+      detailsContainer.innerHTML = '<div class="details-placeholder"><div class="details-placeholder-icon">📋</div><p style="font-size: 16px; margin-bottom: 8px;">尚未選擇渠道</p><p style="font-size: 14px;">請從左側選擇一個渠道以查看詳細資訊</p></div>';
+    }
     
     // 更新狀態
     function updateStatus(message) {
@@ -223,38 +310,83 @@ function renderMainPage() {
       const searchTerm = channelSearchInput.value.trim();
       
       if (!searchTerm) {
-        updateChannelOptions(channelData);
+        updateChannelList(channelData);
+        updateStatus('顯示所有 ' + channelData.length + ' 個渠道');
         return;
       }
       
       const filteredChannels = fuzzySearch(searchTerm, channelData);
-      updateChannelOptions(filteredChannels);
+      updateChannelList(filteredChannels);
       
       updateStatus('找到 ' + filteredChannels.length + ' 個匹配渠道');
     }
     
-    // 更新渠道選項列表
-    function updateChannelOptions(channels) {
-      channelSelect.innerHTML = '';
+    // 更新渠道列表
+    function updateChannelList(channels) {
+      channelList.innerHTML = '';
+      
+      if (channels.length === 0) {
+        channelList.innerHTML = '<div style="padding: 20px; text-align: center; color: #9ca3af;">沒有找到匹配的渠道</div>';
+        return;
+      }
       
       channels.forEach(channel => {
-        const option = document.createElement('option');
-        option.value = channel.id;
-        option.textContent = channel.id + ' - ' + (channel.name || '未命名');
-        channelSelect.appendChild(option);
+        const channelItem = document.createElement('div');
+        channelItem.className = 'channel-item';
+        channelItem.dataset.channelId = channel.id;
+        
+        // 檢查是否有緩存，添加視覺提示
+        const isCached = channelDetailsCache.has(channel.id.toString());
+        const cacheIndicator = isCached ? ' ⚡' : '';
+        
+        channelItem.innerHTML = '<div style="font-weight: 500;">' + channel.id + cacheIndicator + '</div><div style="font-size: 12px; color: #6b7280; margin-top: 2px;">' + (channel.name || '未命名') + '</div>';
+        
+        // 添加點擊事件
+        channelItem.addEventListener('click', () => {
+          handleChannelClick(channel.id);
+        });
+        
+        channelList.appendChild(channelItem);
+      });
+    }
+    
+    // 處理渠道點擊事件
+    async function handleChannelClick(channelId) {
+      // 更新選中狀態
+      document.querySelectorAll('.channel-item').forEach(item => {
+        item.classList.remove('selected');
       });
       
-      if (channels.length > 0) {
-        channelSelect.selectedIndex = 0;
+      const selectedItem = document.querySelector('[data-channel-id="' + channelId + '"]');
+      if (selectedItem) {
+        selectedItem.classList.add('selected');
+      }
+      
+      selectedChannelId = channelId;
+      updateStatus('正在載入渠道詳細資訊...');
+      
+      // 先檢查緩存
+      if (channelDetailsCache.has(channelId.toString())) {
+        const cachedDetails = channelDetailsCache.get(channelId.toString());
+        displayChannelDetails(cachedDetails);
+        updateStatus('已從緩存載入渠道詳細資訊 ⚡');
+        return;
+      }
+      
+      // 如果沒有緩存，則請求詳情
+      try {
+        await getChannelDetails(channelId);
+      } catch (error) {
+        showError('載入渠道詳情失敗: ' + error.message);
       }
     }
     
     // 搜索框輸入事件
     channelSearchInput.addEventListener('input', filterChannelOptions);
     
-    // 獲取渠道列表
+    // 手動獲取渠道列表按鈕（保留向後兼容）
     getChannelsBtn.addEventListener('click', async () => {
-      updateStatus('正在獲取渠道列表...');
+      updateStatus('正在重新獲取渠道列表...');
       getChannelsBtn.disabled = true;
       
       try {
@@ -272,37 +404,16 @@ function renderMainPage() {
         
         channelData = result.data;
         
-        updateChannelOptions(channelData);
+        updateChannelList(channelData);
         
         channelSearchInput.value = '';
         
         channelSelectorGroup.classList.remove('hidden');
-        updateStatus('已獲取 ' + channelData.length + ' 個渠道');
+        updateStatus('已重新獲取 ' + channelData.length + ' 個渠道');
       } catch (error) {
         showError('獲取渠道列表失敗: ' + error.message);
       } finally {
         getChannelsBtn.disabled = false;
-      }
-    });
-    
-    // 獲取渠道詳細資訊
-    getDetailsBtn.addEventListener('click', async () => {
-      const channelId = channelSelect.value;
-      
-      if (!channelId) {
-        alert('請先選擇一個渠道');
-        return;
-      }
-      
-      updateStatus('正在獲取渠道詳細資訊...');
-      getDetailsBtn.disabled = true;
-      detailsContainer.innerHTML = '';
-      detailsSection.classList.remove('hidden');
-      
-      try {
-        await getChannelDetails(channelId);
-      } finally {
-        getDetailsBtn.disabled = false;
       }
     });
     
@@ -315,19 +426,22 @@ function renderMainPage() {
         });
         
         if (!result || !result.data) {
-          detailsContainer.textContent = '無法獲取渠道詳細資訊';
+          detailsContainer.innerHTML = '<div class="details-placeholder"><div class="details-placeholder-icon">❌</div><p style="font-size: 16px; margin-bottom: 8px;">無法獲取渠道詳細資訊</p><p style="font-size: 14px;">請檢查網絡連接或API設定</p></div>';
           updateStatus('獲取渠道詳細資訊失敗');
           return;
         }
         
         currentChannelDetails = result.data;
         
+        // 緩存詳情數據
+        channelDetailsCache.set(channelId.toString(), result.data);
+        
         // 顯示渠道詳細資訊
         displayChannelDetails(currentChannelDetails);
         
         updateStatus("已獲取渠道詳細資訊");
       } catch (error) {
-        detailsContainer.textContent = '獲取渠道詳細資訊時發生錯誤: ' + error.message;
+        detailsContainer.innerHTML = '<div class="details-placeholder"><div class="details-placeholder-icon">❌</div><p style="font-size: 16px; margin-bottom: 8px;">獲取渠道詳細資訊時發生錯誤</p><p style="font-size: 14px;">' + error.message + '</p></div>';
         showError("獲取渠道詳細資訊失敗: " + error.message);
       }
     }
@@ -337,12 +451,12 @@ function renderMainPage() {
       detailsContainer.innerHTML = '';
       
       if (!details) {
-        detailsContainer.textContent = '沒有可顯示的詳細資訊';
+        resetDetailsPanel();
         return;
       }
       
       const table = document.createElement('table');
-      table.className = 'details-table';
+      table.className = 'details-table fade-in';
       
       // 創建表格標題欄
       const thead = document.createElement('thead');
@@ -372,7 +486,7 @@ function renderMainPage() {
         row.appendChild(keyCell);
         
         const valueCell = document.createElement('td');
-        valueCell.className = 'value-cell clickable-cell';
+        valueCell.className = 'value-cell';
         
         let textToCopy = value;
         
@@ -436,7 +550,7 @@ function renderMainPage() {
                 valueCell.classList.remove('copied');
               }, 1000);
               
-              updateStatus('已複製值到剪貼板');
+              updateStatus('已複製值到剪貼板 📋');
             })
             .catch(err => {
               showError("複製失敗: " + err.message);
@@ -451,21 +565,24 @@ function renderMainPage() {
       detailsContainer.appendChild(table);
       
       // 添加複製所有詳情的按鈕
+      const copyAllButton = document.createElement('div');
+      copyAllButton.style.cssText = 'margin-top: 20px; text-align: center;';
+      
       const copyDetailsBtn = document.createElement('button');
-      copyDetailsBtn.textContent = '複製所有詳情';
-      copyDetailsBtn.className = 'copy-details-btn';
+      copyDetailsBtn.textContent = '📋 複製所有詳情';
+      copyDetailsBtn.className = 'btn btn-primary';
       copyDetailsBtn.addEventListener('click', () => {
         navigator.clipboard.writeText(JSON.stringify(details, null, 2))
           .then(() => {
-            updateStatus('已複製所有詳情到剪貼板');
+            updateStatus('已複製所有詳情到剪貼板 📋');
           })
           .catch(err => {
             showError("複製失敗: " + err.message);
           });
       });
       
-      detailsContainer.appendChild(document.createElement('br'));
-      detailsContainer.appendChild(copyDetailsBtn);
+      copyAllButton.appendChild(copyDetailsBtn);
+      detailsContainer.appendChild(copyAllButton);
     }
     
     // HTML 轉義函數
@@ -489,216 +606,577 @@ function renderMainPage() {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>NewAPI Worker 工具</title>
+  
+  <!-- PWA Meta Tags -->
+  <meta name="description" content="NewAPI 渠道管理工具，支持智能緩存和快速查詢">
+  <meta name="theme-color" content="#4a69bd">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="NewAPI Helper">
+  
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      line-height: 1.6;
+    * {
+      box-sizing: border-box;
       margin: 0;
-      padding: 20px;
-      background-color: #f5f5f5;
+      padding: 0;
     }
-    .container {
-      max-width: 1200px;
-      margin: 0 auto;
-      background-color: #fff;
-      padding: 20px;
-      border-radius: 8px;
-      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      line-height: 1.6;
+      background-color: #f5f7fa;
+      color: #2c3e50;
+      overflow-x: hidden;
     }
-    h1 {
-      color: #333;
+
+    /* GitHub 圖標樣式 */
+    .github-link {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 1000;
+      background-color: #24292e;
+      border-radius: 50%;
+      padding: 12px;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      text-decoration: none;
+    }
+    
+    .github-link:hover {
+      background-color: #1c2327;
+      transform: scale(1.1);
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+    }
+    
+    .github-link svg {
+      width: 24px;
+      height: 24px;
+      fill: white;
+      display: block;
+    }
+
+    /* 主容器 - 兩列布局 */
+    .app-container {
+      display: flex;
+      min-height: 100vh;
+      max-height: 100vh;
+    }
+
+    /* 左側面板 - 設定和控制 */
+    .left-panel {
+      flex: 0 0 480px;
+      background: white;
+      border-right: 1px solid #e1e8ed;
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+    }
+
+    /* 右側面板 - 詳情展示 */
+    .right-panel {
+      flex: 1;
+      background: #fafbfc;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* 頁面標題 */
+    .app-header {
+      padding: 20px 24px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
       text-align: center;
-      margin-bottom: 20px;
     }
-    .section {
-      margin-bottom: 30px;
-      padding: 15px;
-      border: 1px solid #ddd;
-      border-radius: 6px;
+
+    .app-title {
+      font-size: 24px;
+      font-weight: 600;
+      margin: 0;
     }
+
+    .app-subtitle {
+      font-size: 14px;
+      opacity: 0.9;
+      margin-top: 4px;
+    }
+
+    /* 設定區塊 */
+    .settings-section, .channels-section {
+      padding: 24px;
+      border-bottom: 1px solid #f0f3f6;
+    }
+
     .section-title {
-      margin-top: 0;
-      margin-bottom: 15px;
-      padding-bottom: 10px;
-      border-bottom: 1px solid #eee;
-    }
-    .form-group {
-      margin-bottom: 15px;
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 16px;
+      color: #2c3e50;
       display: flex;
       align-items: center;
+      gap: 8px;
+    }
+
+    .section-title::before {
+      content: '';
+      width: 4px;
+      height: 18px;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      border-radius: 2px;
+    }
+
+    /* 表單樣式 */
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    .form-label {
+      display: block;
+      font-size: 14px;
+      font-weight: 500;
+      margin-bottom: 6px;
+      color: #374151;
+    }
+
+    .form-input {
+      width: 100%;
+      padding: 12px 16px;
+      border: 2px solid #e5e7eb;
+      border-radius: 8px;
+      font-size: 14px;
+      transition: all 0.3s ease;
+      background: #ffffff;
+    }
+
+    .form-input:focus {
+      outline: none;
+      border-color: #667eea;
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+
+    /* 按鈕樣式 */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 20px;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      text-decoration: none;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+    }
+
+    .btn-secondary {
+      background: #6b7280;
+      color: white;
+    }
+
+    .btn-secondary:hover {
+      background: #4b5563;
+      transform: translateY(-1px);
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none !important;
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 12px;
       flex-wrap: wrap;
     }
-    .form-group label {
-      min-width: 100px;
-      margin-right: 10px;
+
+    /* 狀態指示器 */
+    .status-indicator {
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      margin-top: 8px;
+      transition: all 0.3s ease;
     }
-    .form-group input, .form-group select {
-      flex: 1;
-      padding: 8px;
-      border: 1px solid #ddd;
-      border-radius: 4px;
+
+    .status-success {
+      background: #d1fae5;
+      color: #065f46;
+      border: 1px solid #a7f3d0;
     }
-    .search-group {
-      display: flex;
-      margin-bottom: 10px;
+
+    .status-error {
+      background: #fee2e2;
+      color: #991b1b;
+      border: 1px solid #fca5a5;
     }
-    .search-group input {
-      flex: 1;
-      padding: 8px;
-      border: 1px solid #ddd;
-      border-radius: 4px;
+
+    /* 搜索框 */
+    .search-container {
+      position: relative;
+      margin-bottom: 16px;
     }
-    select.channel-select {
+
+    .search-input {
       width: 100%;
-      height: 200px;
-      margin-bottom: 10px;
+      padding: 12px 16px 12px 44px;
+      border: 2px solid #e5e7eb;
+      border-radius: 8px;
+      font-size: 14px;
+      background: white;
     }
-    button {
-      background-color: #4a69bd;
-      color: white;
-      border: none;
-      padding: 10px 15px;
-      border-radius: 4px;
-      cursor: pointer;
-      margin-right: 5px;
+
+    .search-icon {
+      position: absolute;
+      left: 16px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #9ca3af;
     }
-    button:hover {
-      background-color: #3a599f;
-    }
-    button:disabled {
-      background-color: #cccccc;
-      cursor: not-allowed;
-    }
-    .details-container {
-      margin-top: 20px;
-      border: 1px solid #ddd;
-      padding: 15px;
-      border-radius: 4px;
-      max-height: 500px;
+
+    /* 渠道列表 */
+    .channel-list {
+      max-height: 300px;
       overflow-y: auto;
-      white-space: pre-wrap;
-      background-color: #f9f9f9;
+      border: 2px solid #e5e7eb;
+      border-radius: 8px;
+      background: white;
     }
-    .status {
-      margin-top: 10px;
-      padding: 8px;
-      background-color: #f0f0f0;
-      border-radius: 4px;
+
+    .channel-item {
+      padding: 12px 16px;
+      border-bottom: 1px solid #f3f4f6;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      font-size: 14px;
     }
-    .hidden {
-      display: none;
+
+    .channel-item:hover {
+      background: #f8fafc;
     }
+
+    .channel-item.selected {
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      color: white;
+    }
+
+    .channel-item:last-child {
+      border-bottom: none;
+    }
+
+    /* 提示信息 */
+    .info-card {
+      background: linear-gradient(135deg, #e0e7ff, #f0f9ff);
+      border: 1px solid #c7d2fe;
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 20px;
+      font-size: 14px;
+      color: #3730a3;
+    }
+
+    /* 右側詳情面板 */
+    .details-header {
+      padding: 24px;
+      background: white;
+      border-bottom: 1px solid #e5e7eb;
+      flex-shrink: 0;
+    }
+
+    .details-title {
+      font-size: 20px;
+      font-weight: 600;
+      color: #1f2937;
+      margin-bottom: 8px;
+    }
+
+    .details-subtitle {
+      color: #6b7280;
+      font-size: 14px;
+    }
+
+    .details-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px;
+    }
+
+    .details-placeholder {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      color: #9ca3af;
+      text-align: center;
+    }
+
+    .details-placeholder-icon {
+      font-size: 48px;
+      margin-bottom: 16px;
+    }
+
+    /* 詳情表格 */
     .details-table {
       width: 100%;
       border-collapse: collapse;
+      background: white;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
     }
-    .details-table th, .details-table td {
-      padding: 8px;
-      border: 1px solid #ddd;
-      text-align: left;
-    }
+
     .details-table th {
-      background-color: #f2f2f2;
+      background: #f8fafc;
+      padding: 16px;
+      text-align: left;
+      font-weight: 600;
+      color: #374151;
+      border-bottom: 1px solid #e5e7eb;
     }
+
+    .details-table td {
+      padding: 16px;
+      border-bottom: 1px solid #f3f4f6;
+      vertical-align: top;
+    }
+
+    .details-table tr:last-child td {
+      border-bottom: none;
+    }
+
     .key-cell {
-      width: 20%;
-      font-weight: bold;
+      width: 25%;
+      font-weight: 500;
+      color: #4b5563;
     }
+
     .value-cell {
       position: relative;
-      padding-right: 10px;
+      cursor: pointer;
+      transition: background-color 0.2s ease;
     }
+
+    .value-cell:hover {
+      background-color: #f8fafc;
+    }
+
+    .value-cell.copied {
+      background-color: #d1fae5;
+    }
+
     .value-cell pre {
       margin: 0;
       white-space: pre-wrap;
       word-break: break-word;
+      font-family: 'SF Mono', Monaco, monospace;
+      font-size: 13px;
+      background: #f8fafc;
+      padding: 8px;
+      border-radius: 4px;
     }
-    .clickable-cell {
-      cursor: pointer;
-      transition: background-color 0.2s ease;
+
+    /* 底部狀態欄 */
+    .status-bar {
+      padding: 16px 24px;
+      background: white;
+      border-top: 1px solid #e5e7eb;
+      font-size: 14px;
+      color: #6b7280;
+      flex-shrink: 0;
     }
-    .clickable-cell:hover {
-      background-color: #f0f0f0;
+
+    /* 響應式設計 */
+    @media (max-width: 1024px) {
+      .app-container {
+        flex-direction: column;
+        max-height: none;
+      }
+
+      .left-panel {
+        flex: none;
+        border-right: none;
+        border-bottom: 1px solid #e1e8ed;
+      }
+
+      .right-panel {
+        min-height: 60vh;
+      }
+
+      .github-link {
+        top: 10px;
+        right: 10px;
+        padding: 8px;
+      }
+
+      .github-link svg {
+        width: 20px;
+        height: 20px;
+      }
     }
-    .clickable-cell.copied {
-      background-color: #d4edda;
+
+    @media (max-width: 640px) {
+      .left-panel, .details-content {
+        padding: 16px;
+      }
+
+      .app-header {
+        padding: 16px;
+      }
+
+      .settings-section, .channels-section {
+        padding: 16px;
+      }
+
+      .btn-group {
+        flex-direction: column;
+      }
+
+      .btn {
+        justify-content: center;
+      }
     }
-    .clickable-cell::after {
-      content: '點擊複製';
-      position: absolute;
-      right: 10px;
-      top: 50%;
-      transform: translateY(-50%);
-      font-size: 12px;
-      color: #6c757d;
-      opacity: 0;
-      transition: opacity 0.2s ease;
+
+    /* 動畫效果 */
+    .fade-in {
+      animation: fadeIn 0.3s ease-out;
     }
-    .clickable-cell:hover::after {
-      opacity: 1;
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
     }
-    .copy-btn {
-      position: absolute;
-      right: 5px;
-      top: 5px;
-      padding: 3px 8px;
-      font-size: 12px;
-      background-color: #5cb85c;
+
+    /* 隱藏類 */
+    .hidden {
+      display: none !important;
     }
-    .copy-details-btn {
-      margin-top: 10px;
-      background-color: #5cb85c;
+
+    /* 載入動畫 */
+    .loading {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 2px solid #ffffff;
+      border-radius: 50%;
+      border-top-color: transparent;
+      animation: spin 1s ease-in-out infinite;
     }
-    .channel-selection-container {
-      display: flex;
-      flex-direction: column;
-      width: 100%;
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
     }
   </style>
 </head>
 <body>
-  <div class="container">
-    <h1>NewAPI Worker 工具</h1>
-    
-    <div class="section">
-      <h2 class="section-title">API 設定</h2>
-      <div class="form-group">
-        <label for="api-url">API URL:</label>
-        <input type="text" id="api-url" placeholder="例如: https://api.example.com">
+  <!-- GitHub 圖標連結 -->
+  <a href="https://github.com/123hi123/newapi-helper" target="_blank" class="github-link" title="查看 GitHub 項目">
+    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+      <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
+    </svg>
+  </a>
+
+  <div class="app-container">
+    <!-- 左側面板 -->
+    <div class="left-panel">
+      <!-- 應用標題 -->
+      <div class="app-header">
+        <h1 class="app-title">NewAPI Helper</h1>
+        <p class="app-subtitle">智能渠道管理工具</p>
       </div>
-      <div class="form-group">
-        <label for="access-token">Access Token:</label>
-        <input type="password" id="access-token" placeholder="輸入您的 Access Token">
+
+      <!-- API 設定區塊 -->
+      <div class="settings-section">
+        <h2 class="section-title">🔧 API 設定</h2>
+        
+        <div class="form-group">
+          <label class="form-label" for="api-url">API URL</label>
+          <input type="text" id="api-url" class="form-input" placeholder="例如: https://api.example.com">
+        </div>
+        
+        <div class="form-group">
+          <label class="form-label" for="access-token">Access Token</label>
+          <input type="password" id="access-token" class="form-input" placeholder="輸入您的 Access Token">
+        </div>
+        
+        <div class="btn-group">
+          <button id="save-credentials" class="btn btn-primary">
+            💾 儲存憑證
+          </button>
+          <button id="clear-credentials" class="btn btn-secondary">
+            🗑️ 清除憑證
+          </button>
+        </div>
+        
+        <div id="credentials-status" class="status-indicator hidden"></div>
       </div>
-      <div class="form-group">
-        <button id="save-credentials">儲存憑證</button>
-        <button id="clear-credentials">清除憑證</button>
-        <span id="credentials-status"></span>
+
+      <!-- 渠道選擇區塊 -->
+      <div class="channels-section">
+        <h2 class="section-title">📡 渠道管理</h2>
+        
+        <div class="btn-group" style="margin-bottom: 20px;">
+          <button id="get-channels" class="btn btn-primary">
+            🔄 手動重載渠道
+          </button>
+        </div>
+
+        <div id="channel-selector-group" class="hidden">
+          <div class="info-card">
+            💡 直接點擊渠道即可查看詳情，前10個渠道已預緩存，載入更快速！
+          </div>
+          
+          <div class="search-container">
+            <div class="search-icon">🔍</div>
+            <input type="text" id="channel-search" class="search-input" placeholder="搜索渠道 ID 或名稱...">
+          </div>
+          
+          <div id="channel-list" class="channel-list"></div>
+        </div>
+      </div>
+
+      <!-- 狀態欄 -->
+      <div class="status-bar">
+        <div id="status">準備就緒</div>
       </div>
     </div>
-    
-    <div class="section">
-      <h2 class="section-title">渠道列表</h2>
-      <div class="form-group">
-        <button id="get-channels">獲取渠道列表</button>
+
+    <!-- 右側面板 -->
+    <div class="right-panel">
+      <div class="details-header">
+        <h2 class="details-title">渠道詳細資訊</h2>
+        <p class="details-subtitle">點擊左側渠道以查看詳細配置</p>
       </div>
-      <div class="form-group hidden" id="channel-selector-group">
-        <div class="channel-selection-container">
-          <div class="search-group">
-            <input type="text" id="channel-search" placeholder="搜索渠道 (ID 或名稱)...">
+      
+      <div class="details-content">
+        <div id="channel-details-container">
+          <div class="details-placeholder">
+            <div class="details-placeholder-icon">📋</div>
+            <p style="font-size: 16px; margin-bottom: 8px;">尚未選擇渠道</p>
+            <p style="font-size: 14px;">請從左側選擇一個渠道以查看詳細資訊</p>
           </div>
-          <select id="channel-select" class="channel-select" size="10"></select>
-          <button id="get-details">獲取詳情</button>
         </div>
       </div>
     </div>
-    
-    <div class="section hidden" id="channel-details-section">
-      <h2 class="section-title">渠道詳細資訊</h2>
-      <div id="channel-details-container" class="details-container"></div>
-    </div>
-    
-    <div id="status" class="status">準備就緒</div>
   </div>
 
   <script>${scriptCode}</script>
