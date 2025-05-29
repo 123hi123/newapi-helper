@@ -597,6 +597,46 @@ function renderMainPage() {
     
     // 初始化
     loadCredentials();
+    
+    // 動態生成PWA Manifest
+    function createManifest() {
+      const manifest = {
+        name: "NewAPI Helper",
+        short_name: "NewAPI",
+        description: "NewAPI 渠道管理工具，支持智能緩存和快速查詢",
+        start_url: "/",
+        display: "standalone",
+        background_color: "#f5f7fa",
+        theme_color: "#4a69bd",
+        icons: [
+          {
+            src: "https://5fddeabb.cloudflare-imgbed-42c.pages.dev/file/1748520079762_image.png",
+            sizes: "192x192",
+            type: "image/png"
+          },
+          {
+            src: "https://5fddeabb.cloudflare-imgbed-42c.pages.dev/file/1748520079762_image.png",
+            sizes: "512x512",
+            type: "image/png"
+          }
+        ]
+      };
+      
+      const manifestBlob = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
+      const manifestURL = URL.createObjectURL(manifestBlob);
+      
+      const manifestLink = document.createElement('link');
+      manifestLink.rel = 'manifest';
+      manifestLink.href = manifestURL;
+      document.head.appendChild(manifestLink);
+    }
+    
+    // 在頁面載入完成後創建manifest
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', createManifest);
+    } else {
+      createManifest();
+    }
   `;
 
   // HTML 內容
@@ -607,12 +647,24 @@ function renderMainPage() {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>NewAPI Worker 工具</title>
   
+  <!-- 應用圖標 -->
+  <link rel="icon" type="image/png" href="https://5fddeabb.cloudflare-imgbed-42c.pages.dev/file/1748520079762_image.png">
+  <link rel="shortcut icon" type="image/png" href="https://5fddeabb.cloudflare-imgbed-42c.pages.dev/file/1748520079762_image.png">
+  <link rel="apple-touch-icon" href="https://5fddeabb.cloudflare-imgbed-42c.pages.dev/file/1748520079762_image.png">
+  <link rel="apple-touch-icon" sizes="152x152" href="https://5fddeabb.cloudflare-imgbed-42c.pages.dev/file/1748520079762_image.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="https://5fddeabb.cloudflare-imgbed-42c.pages.dev/file/1748520079762_image.png">
+  <link rel="apple-touch-icon" sizes="167x167" href="https://5fddeabb.cloudflare-imgbed-42c.pages.dev/file/1748520079762_image.png">
+  
   <!-- PWA Meta Tags -->
   <meta name="description" content="NewAPI 渠道管理工具，支持智能緩存和快速查詢">
   <meta name="theme-color" content="#4a69bd">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="NewAPI Helper">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="application-name" content="NewAPI Helper">
+  <meta name="msapplication-TileColor" content="#4a69bd">
+  <meta name="msapplication-TileImage" content="https://5fddeabb.cloudflare-imgbed-42c.pages.dev/file/1748520079762_image.png">
   
   <style>
     * {
