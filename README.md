@@ -106,10 +106,6 @@
   <li>點擊 "Save and Deploy"</li>
   <li>使用分配的網址訪問您的應用</li>
 </ol>
-<<<<<<< HEAD
-
-=======
->>>>>>> 55ee5e3 (1)
 ## 📝 使用方法
 
 ### 🌐 訪問工具
@@ -130,7 +126,7 @@
 </td>
 <td>
 
-![image-20250530113550255](https://cdn.jsdelivr.net/gh/321hi123/typoraimgbed/img/image-20250530113550255.png)
+
 
 **在工具中填入憑證** 📝
 
@@ -143,6 +139,8 @@
 </td>
 </tr>
 </table>
+
+![image-20250530113550255](https://cdn.jsdelivr.net/gh/321hi123/typoraimgbed/img/image-20250530113550255.png)
 
 ### 🔍 查詢渠道信息
 
@@ -365,7 +363,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 <<<<<<< HEAD
-``` 
+```
 =======
 ```
 >>>>>>> 55ee5e3 (1)
