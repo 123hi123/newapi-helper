@@ -107,8 +107,6 @@
   <li>使用分配的網址訪問您的應用</li>
 </ol>
 
-![部署流程](https://www.cloudflare.com/static/9fbc15496b47ff30cdb86abac2ea5834/workers_deploy_dashboard.png)
-
 ## 📝 使用方法
 
 ### 🌐 訪問工具
