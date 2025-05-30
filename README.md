@@ -70,7 +70,7 @@
    name = "newapi-worker"
    main = "worker.js"
    compatibility_date = "2023-06-28"
-
+   
    [triggers]
    routes = [{ pattern = "你的域名", custom_domain = true }]
    ```
@@ -106,7 +106,10 @@
   <li>點擊 "Save and Deploy"</li>
   <li>使用分配的網址訪問您的應用</li>
 </ol>
+<<<<<<< HEAD
 
+=======
+>>>>>>> 55ee5e3 (1)
 ## 📝 使用方法
 
 ### 🌐 訪問工具
@@ -118,20 +121,25 @@
 <table>
 <tr>
 <td>
-  
+
 **準備 NewAPI 憑證** 🗝️
 - 您需要有效的 NewAPI URL 和 Access Token。
 - 如果沒有這些資訊，請聯繫您的 NewAPI 管理員。
   
+
 </td>
 <td>
-  
+
+![image-20250530113550255](https://cdn.jsdelivr.net/gh/321hi123/typoraimgbed/img/image-20250530113550255.png)
+
 **在工具中填入憑證** 📝
+
 - 在界面的 "API 設定" 區塊中：
   - API URL：輸入您的 NewAPI 完整 URL
   - Access Token：輸入您的 API 訪問令牌
 - 點擊「儲存憑證」按鈕保存到本地存儲
   
+
 </td>
 </tr>
 </table>
@@ -356,4 +364,8 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+<<<<<<< HEAD
 ``` 
+=======
+```
+>>>>>>> 55ee5e3 (1)
