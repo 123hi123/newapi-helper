@@ -95,12 +95,17 @@ function renderMainPage() {
     let currentChannelDetails = null;
     let channelDetailsCache = new Map(); // 添加詳情緩存
     let selectedChannelId = null;
+    let currentAccountId = null; // 當前賬號ID
+    let displayMode = 'channels'; // 顯示模式：'channels' 或 'redemptions'
     
     // DOM 元素引用
     const apiUrlInput = document.getElementById('api-url');
     const accessTokenInput = document.getElementById('access-token');
+    const accountNameInput = document.getElementById('account-name');
     const saveCredentialsBtn = document.getElementById('save-credentials');
     const clearCredentialsBtn = document.getElementById('clear-credentials');
+    const accountSelector = document.getElementById('account-selector');
+    const deleteAccountBtn = document.getElementById('delete-account');
     const credentialsStatus = document.getElementById('credentials-status');
     const getChannelsBtn = document.getElementById('get-channels');
     const channelSelectorGroup = document.getElementById('channel-selector-group');
@@ -109,22 +114,72 @@ function renderMainPage() {
     const detailsContainer = document.getElementById('channel-details-container');
     const statusElement = document.getElementById('status');
     
+    // 優惠碼生成相關元素
+    const generateRedemptionBtn = document.getElementById('generate-redemption');
+    const redemptionAmountInput = document.getElementById('redemption-amount');
+    const redemptionCountInput = document.getElementById('redemption-count');
+    
+    // 多賬號管理功能
+    function getAccounts() {
+      const accounts = localStorage.getItem('newapi_accounts');
+      return accounts ? JSON.parse(accounts) : {};
+    }
+    
+    function saveAccount(accountId, accountData) {
+      const accounts = getAccounts();
+      accounts[accountId] = accountData;
+      localStorage.setItem('newapi_accounts', JSON.stringify(accounts));
+    }
+    
+    function deleteAccount(accountId) {
+      const accounts = getAccounts();
+      delete accounts[accountId];
+      localStorage.setItem('newapi_accounts', JSON.stringify(accounts));
+    }
+    
+    function getCurrentAccount() {
+      const currentId = localStorage.getItem('newapi_current_account');
+      if (!currentId) return null;
+      
+      const accounts = getAccounts();
+      return accounts[currentId] || null;
+    }
+    
     // 加載保存的憑證
     function loadCredentials() {
-      const apiUrl = localStorage.getItem('newapi_url');
-      const accessToken = localStorage.getItem('newapi_token');
+      updateAccountSelector();
       
-      if (apiUrl) apiUrlInput.value = apiUrl;
-      if (accessToken) accessTokenInput.value = accessToken;
-      
-      if (apiUrl && accessToken) {
-        showCredentialsStatus('已載入儲存的憑證', 'success');
+      const currentAccount = getCurrentAccount();
+      if (currentAccount) {
+        apiUrlInput.value = currentAccount.api_url;
+        accessTokenInput.value = currentAccount.access_token;
+        accountNameInput.value = currentAccount.name;
+        currentAccountId = localStorage.getItem('newapi_current_account');
+        
+        showCredentialsStatus('已載入儲存的憑證: ' + currentAccount.name, 'success');
         
         // 自動獲取渠道列表
         setTimeout(() => {
           autoLoadChannels();
         }, 500);
       }
+    }
+    
+    function updateAccountSelector() {
+      const accounts = getAccounts();
+      const currentId = localStorage.getItem('newapi_current_account');
+      
+      accountSelector.innerHTML = '<option value="">選擇賬號...</option>';
+      
+      Object.entries(accounts).forEach(([id, account]) => {
+        const option = document.createElement('option');
+        option.value = id;
+        option.textContent = account.name;
+        option.selected = id === currentId;
+        accountSelector.appendChild(option);
+      });
+      
+      deleteAccountBtn.style.display = currentId ? 'inline-flex' : 'none';
     }
     
     // 顯示憑證狀態
@@ -203,16 +258,27 @@ function renderMainPage() {
     saveCredentialsBtn.addEventListener('click', () => {
       const apiUrl = apiUrlInput.value.trim();
       const accessToken = accessTokenInput.value.trim();
+      const accountName = accountNameInput.value.trim();
       
-      if (!apiUrl || !accessToken) {
-        showCredentialsStatus('請輸入 API URL 和 Access Token', 'error');
+      if (!apiUrl || !accessToken || !accountName) {
+        showCredentialsStatus('請輸入完整的賬號資訊', 'error');
         return;
       }
       
-      localStorage.setItem('newapi_url', apiUrl);
-      localStorage.setItem('newapi_token', accessToken);
+      const accountId = Date.now().toString();
+      const accountData = {
+        name: accountName,
+        api_url: apiUrl,
+        access_token: accessToken,
+        created_at: new Date().toISOString()
+      };
       
-      showCredentialsStatus('憑證已儲存', 'success');
+      saveAccount(accountId, accountData);
+      localStorage.setItem('newapi_current_account', accountId);
+      currentAccountId = accountId;
+      
+      updateAccountSelector();
+      showCredentialsStatus('憑證已儲存: ' + accountName, 'success');
       
       // 儲存後自動載入渠道
       setTimeout(() => {
@@ -220,24 +286,105 @@ function renderMainPage() {
       }, 500);
     });
     
-    // 清除憑證
+    // 賬號切換
+    accountSelector.addEventListener('change', () => {
+      const selectedAccountId = accountSelector.value;
+      
+      if (!selectedAccountId) {
+        // 清空表單
+        apiUrlInput.value = '';
+        accessTokenInput.value = '';
+        accountNameInput.value = '';
+        currentAccountId = null;
+        localStorage.removeItem('newapi_current_account');
+        
+        // 清除緩存和狀態
+        channelData = [];
+        channelDetailsCache.clear();
+        selectedChannelId = null;
+        channelSelectorGroup.classList.add('hidden');
+        resetDetailsPanel();
+        
+        deleteAccountBtn.style.display = 'none';
+        showCredentialsStatus('已清除當前賬號', 'success');
+        return;
+      }
+      
+      const accounts = getAccounts();
+      const selectedAccount = accounts[selectedAccountId];
+      
+      if (selectedAccount) {
+        apiUrlInput.value = selectedAccount.api_url;
+        accessTokenInput.value = selectedAccount.access_token;
+        accountNameInput.value = selectedAccount.name;
+        currentAccountId = selectedAccountId;
+        localStorage.setItem('newapi_current_account', selectedAccountId);
+        
+        // 清除舊的緩存和狀態
+        channelData = [];
+        channelDetailsCache.clear();
+        selectedChannelId = null;
+        channelSelectorGroup.classList.add('hidden');
+        resetDetailsPanel();
+        
+        deleteAccountBtn.style.display = 'inline-flex';
+        showCredentialsStatus('已切換到賬號: ' + selectedAccount.name, 'success');
+        
+        // 自動載入新賬號的渠道
+        setTimeout(() => {
+          autoLoadChannels();
+        }, 500);
+      }
+    });
+    
+    // 刪除賬號
+    deleteAccountBtn.addEventListener('click', () => {
+      if (!currentAccountId) return;
+      
+      if (confirm('確定要刪除當前賬號嗎？此操作無法撤銷。')) {
+        deleteAccount(currentAccountId);
+        localStorage.removeItem('newapi_current_account');
+        
+        // 清空表單和狀態
+        apiUrlInput.value = '';
+        accessTokenInput.value = '';
+        accountNameInput.value = '';
+        currentAccountId = null;
+        
+        channelData = [];
+        channelDetailsCache.clear();
+        selectedChannelId = null;
+        channelSelectorGroup.classList.add('hidden');
+        resetDetailsPanel();
+        
+        updateAccountSelector();
+        showCredentialsStatus('賬號已刪除', 'success');
+      }
+    });
+    
+    // 清除憑證（保留向後兼容）
     clearCredentialsBtn.addEventListener('click', () => {
-      localStorage.removeItem('newapi_url');
-      localStorage.removeItem('newapi_token');
-      
-      apiUrlInput.value = '';
-      accessTokenInput.value = '';
-      
-      // 清除緩存和狀態
-      channelData = [];
-      channelDetailsCache.clear();
-      selectedChannelId = null;
-      channelSelectorGroup.classList.add('hidden');
-      
-      // 重置詳情面板
-      resetDetailsPanel();
-      
-      showCredentialsStatus('憑證已清除', 'success');
+      if (confirm('確定要清除所有賬號嗎？此操作無法撤銷。')) {
+        localStorage.removeItem('newapi_accounts');
+        localStorage.removeItem('newapi_current_account');
+        
+        apiUrlInput.value = '';
+        accessTokenInput.value = '';
+        accountNameInput.value = '';
+        currentAccountId = null;
+        
+        // 清除緩存和狀態
+        channelData = [];
+        channelDetailsCache.clear();
+        selectedChannelId = null;
+        channelSelectorGroup.classList.add('hidden');
+        
+        // 重置詳情面板
+        resetDetailsPanel();
+        
+        updateAccountSelector();
+        showCredentialsStatus('所有憑證已清除', 'success');
+      }
     });
     
     // 重置詳情面板
@@ -258,11 +405,12 @@ function renderMainPage() {
     
     // 發送 API 請求
     async function callAPI(endpoint, method = 'GET', params = {}, body = {}) {
-      const apiUrl = localStorage.getItem('newapi_url') || apiUrlInput.value.trim();
-      const accessToken = localStorage.getItem('newapi_token') || accessTokenInput.value.trim();
+      const currentAccount = getCurrentAccount();
+      const apiUrl = currentAccount?.api_url || apiUrlInput.value.trim();
+      const accessToken = currentAccount?.access_token || accessTokenInput.value.trim();
       
       if (!apiUrl || !accessToken) {
-        showError('請輸入 API URL 和 Access Token');
+        showError('請選擇賬號或輸入 API URL 和 Access Token');
         return null;
       }
       
@@ -444,6 +592,114 @@ function renderMainPage() {
         detailsContainer.innerHTML = '<div class="details-placeholder"><div class="details-placeholder-icon">❌</div><p style="font-size: 16px; margin-bottom: 8px;">獲取渠道詳細資訊時發生錯誤</p><p style="font-size: 14px;">' + error.message + '</p></div>';
         showError("獲取渠道詳細資訊失敗: " + error.message);
       }
+    }
+    
+    // 優惠碼生成功能
+    generateRedemptionBtn.addEventListener('click', async () => {
+      const amount = parseFloat(redemptionAmountInput.value);
+      const count = parseInt(redemptionCountInput.value);
+      
+      if (!amount || amount <= 0) {
+        showError('請輸入有效的額度（美金）');
+        return;
+      }
+      
+      if (!count || count <= 0) {
+        showError('請輸入有效的數量');
+        return;
+      }
+      
+      // 轉換美金為quota（1美金 = 500000 quota）
+      const quota = Math.round(amount * 500000);
+      
+      generateRedemptionBtn.disabled = true;
+      generateRedemptionBtn.innerHTML = '<div class="loading"></div> 生成中...';
+      updateStatus('正在生成優惠碼...');
+      
+      try {
+        const result = await callAPI('/api/redemption/', 'POST', {}, {
+          name: 'rdp',
+          quota: quota,
+          count: count
+        });
+        
+        if (result && result.data) {
+          displayMode = 'redemptions';
+          displayRedemptionCodes(result.data, amount, count);
+          updateStatus('成功生成 ' + count + ' 個優惠碼');
+        } else {
+          showError('生成優惠碼失敗：無效的回應數據');
+        }
+      } catch (error) {
+        showError('生成優惠碼失敗: ' + error.message);
+      } finally {
+        generateRedemptionBtn.disabled = false;
+        generateRedemptionBtn.innerHTML = '🎫 生成優惠碼';
+      }
+    });
+    
+    // 顯示優惠碼結果
+    function displayRedemptionCodes(codes, amount, count) {
+      detailsContainer.innerHTML = '';
+      
+      const header = document.createElement('div');
+      header.style.cssText = 'margin-bottom: 20px; padding: 16px; background: linear-gradient(135deg, #10b981, #059669); color: white; border-radius: 8px;';
+      header.innerHTML = '<h3 style="margin: 0; font-size: 18px;">✅ 優惠碼生成成功</h3><p style="margin: 8px 0 0; font-size: 14px;">生成了 ' + count + ' 個價值 $' + amount + ' 的優惠碼</p>';
+      detailsContainer.appendChild(header);
+      
+      const codesContainer = document.createElement('div');
+      codesContainer.style.cssText = 'background: white; border-radius: 8px; padding: 20px; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);';
+      
+      const title = document.createElement('h4');
+      title.textContent = '優惠碼列表';
+      title.style.cssText = 'margin: 0 0 16px; color: #1f2937; font-size: 16px;';
+      codesContainer.appendChild(title);
+      
+      const codesList = document.createElement('div');
+      codesList.style.cssText = 'font-family: monospace; font-size: 14px; line-height: 1.8; background: #f8fafc; padding: 16px; border-radius: 6px; border: 1px solid #e5e7eb;';
+      
+      if (Array.isArray(codes)) {
+        codesList.textContent = codes.join('\\n');
+      } else {
+        codesList.textContent = codes;
+      }
+      
+      codesContainer.appendChild(codesList);
+      
+      // 添加複製按鈕
+      const copyButton = document.createElement('button');
+      copyButton.textContent = '📋 複製所有優惠碼';
+      copyButton.className = 'btn btn-primary';
+      copyButton.style.cssText = 'margin-top: 16px; width: 100%;';
+      copyButton.addEventListener('click', () => {
+        const textToCopy = Array.isArray(codes) ? codes.join('\\n') : codes;
+        navigator.clipboard.writeText(textToCopy)
+          .then(() => {
+            updateStatus('已複製所有優惠碼到剪貼板 📋');
+          })
+          .catch(err => {
+            showError("複製失敗: " + err.message);
+          });
+      });
+      
+      codesContainer.appendChild(copyButton);
+      
+      // 添加返回渠道檢視按鈕
+      const backButton = document.createElement('button');
+      backButton.textContent = '🔙 返回渠道檢視';
+      backButton.className = 'btn btn-secondary';
+      backButton.style.cssText = 'margin-top: 12px; width: 100%;';
+      backButton.addEventListener('click', () => {
+        displayMode = 'channels';
+        if (selectedChannelId) {
+          handleChannelClick(selectedChannelId);
+        } else {
+          resetDetailsPanel();
+        }
+      });
+      
+      codesContainer.appendChild(backButton);
+      detailsContainer.appendChild(codesContainer);
     }
     
     // 顯示渠道詳細資訊
@@ -1199,12 +1455,24 @@ function renderMainPage() {
       <!-- 應用標題 -->
       <div class="app-header">
         <h1 class="app-title">NewAPI Helper</h1>
-        <p class="app-subtitle">智能渠道管理工具</p>
+        <p class="app-subtitle">多用戶智能管理工具 - 渠道查詢 & 優惠碼生成</p>
       </div>
 
       <!-- API 設定區塊 -->
       <div class="settings-section">
-        <h2 class="section-title">🔧 API 設定</h2>
+        <h2 class="section-title">🔧 多用戶設定</h2>
+        
+        <div class="form-group">
+          <label class="form-label" for="account-selector">選擇賬號</label>
+          <select id="account-selector" class="form-input">
+            <option value="">選擇賬號...</option>
+          </select>
+        </div>
+        
+        <div class="form-group">
+          <label class="form-label" for="account-name">賬號名稱</label>
+          <input type="text" id="account-name" class="form-input" placeholder="例如: 主要賬號">
+        </div>
         
         <div class="form-group">
           <label class="form-label" for="api-url">API URL</label>
@@ -1218,10 +1486,13 @@ function renderMainPage() {
         
         <div class="btn-group">
           <button id="save-credentials" class="btn btn-primary">
-            💾 儲存憑證
+            💾 儲存賬號
+          </button>
+          <button id="delete-account" class="btn btn-secondary" style="display: none;">
+            🗑️ 刪除賬號
           </button>
           <button id="clear-credentials" class="btn btn-secondary">
-            🗑️ 清除憑證
+            🧹 清除所有
           </button>
         </div>
         
@@ -1250,6 +1521,29 @@ function renderMainPage() {
           
           <div id="channel-list" class="channel-list"></div>
         </div>
+      </div>
+
+      <!-- 優惠碼生成區塊 -->
+      <div class="settings-section">
+        <h2 class="section-title">🎫 優惠碼生成</h2>
+        
+        <div class="info-card">
+          💡 生成優惠碼需要當前賬號有對應的權限，生成結果將顯示在右側面板
+        </div>
+        
+        <div class="form-group">
+          <label class="form-label" for="redemption-amount">額度 (美金)</label>
+          <input type="number" id="redemption-amount" class="form-input" placeholder="例如: 10" min="0.01" step="0.01">
+        </div>
+        
+        <div class="form-group">
+          <label class="form-label" for="redemption-count">數量</label>
+          <input type="number" id="redemption-count" class="form-input" placeholder="例如: 5" min="1" step="1">
+        </div>
+        
+        <button id="generate-redemption" class="btn btn-primary" style="width: 100%;">
+          🎫 生成優惠碼
+        </button>
       </div>
 
       <!-- 狀態欄 -->
